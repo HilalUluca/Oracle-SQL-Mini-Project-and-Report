@@ -1,0 +1,217 @@
+--SELECT, WHERE, ORDER BY ve fazlası
+
+--İsmi S ile başlayan çalışanların isim ve soyismini listele.--
+select FIRST_NAME, LAST_NAME from hr.EMPLOYEES 
+where FIRST_NAME LIKE 'S%';
+
+--Telefon numarası null olan çalışanları bul.
+SELECT *from hr.EMPLOYEES
+where PHONE_NUMBER is NULL;
+
+--Job_ID’si ‘IT_PROG’, ‘SA_REP’ veya ‘AD_VP’ olan çalışanları listele.
+select *from hr.EMPLOYEES
+where JOB_ID in ('IT_PROG','SA_REP','AD_VP');
+
+-- 2010 yılında işe alınan çalışanları listele.
+select FIRST_NAME, LAST_NAME, HIRE_DATE from hr.EMPLOYEES
+where EXTRACT(year from HIRE_DATE)=2010;
+
+--Her çalışanın maaşını ve departman ortalamasını göster.
+select first_name,last_name,salary,DEPARTMENT_ID,
+  avg(salary) over (partition by DEPARTMENT_ID) as deptavgsalary
+from hr.EMPLOYEES;
+
+--Maaşı 5000’den büyük çalışanları alfabetik sırayla getir.
+select first_name,last_name,salary from hr.EMPLOYEES
+where salary >5000
+order by FIRST_NAME asc;
+
+--HR veritabanında kaç farklı departman var?
+select count(distinct DEPARTMENT_ID)from hr.EMPLOYEES
+
+
+--FONKSİYONLAR
+
+--Çalışanların adını küçük harf, soyadını büyük harf ile listele.
+select LOWER(first_name), UPPER(last_name) FROM employees;
+
+--Çalışanların soyadının son üç harfini listele.
+select substr(last_name,1,3) from hr.employees;
+
+--Çalışanların işe giriş tarihine göre kaç gündür şirkette olduklarını bul.
+select FIRST_NAME,LAST_NAME,(sysdate-hire_date) from hr.employees 
+
+--Çalışanların isim soyisim sütununu birleştir, sonuna @company.com ekle.
+select concat(first_name,last_name)|| '@company.com' from hr.employees;
+
+--Çalışanların maaşını (salary) en yakın tam sayıya yuvarla ve listele.
+select first_name, last_name, round(salary) from hr.employees
+
+--Departman id 10,11,12,13,14 olan çalışanlarıın maaşını yukarı ve aşağı yuvarla
+select first_name,last_name, DEPARTMENT_ID, ceil(salary), floor(salary)
+from hr.employees
+where DEPARTMENT_ID in (10,11,12,13,14);
+
+--Çalışanların işe giriş tarihini 'DD-MON-YYYY' formatında göster.
+select first_name,LAST_NAME, to_char(hire_date,'YYYY-MON-DD') from hr.EMPLOYEES
+
+
+--NULL, CASE
+
+--Maaş null ise 2000, prim null ise 100, ikisi de dolu ise toplamını al.
+   select
+      case
+         when salary is null then 2000,
+         when commission_pct is null then 100,
+         else salary + commission_pct
+      end as toplam 
+   from hr.employees;
+
+
+--AGGREGATION, GROUP BY, HAVING
+
+--Her departmandaki toplam maaşı bul.
+select DEPARTMENT_ID, sum(salary) from hr.employees
+group by DEPARTMENT_ID;
+
+--Her departman ve pozisyon için ortalama maaş ve çalışan sayısını göster.
+select DEPARTMENT_ID, JOB_ID, avg(salary), count(*) from hr.EMPLOYEES
+group by DEPARTMENT_ID,JOB_ID;
+
+--Çalışan sayısı 5’ten fazla olan departmanları ve ortalama maaşlarını göster.
+select avg(salary),count(*), DEPARTMENT_ID from hr.employees
+group by DEPARTMENT_ID
+having count(*)>5;
+
+
+--JOINLER
+
+--Maaşı 5000’den fazla olan çalışanların adını ve departman adını listele.
+select e.first_name,e.last_name,d.department_name,e.salary from hr.employees e 
+inner join hr.departments d 
+on e.department_id=d.department_id
+where e.salary >5000;
+
+--Departmanı olmayan çalışanları listele, maaşı ve departman adını göster.
+select e.first_name,e.last_name, d.department_name,e.salary from hr.employees e
+left join hr.departments d 
+on e.department_id=d.department_id
+
+--Her departmanı göster, çalışanı olmasa bile, toplam çalışan sayısını da ekle.
+select d.department_name, COUNT(e.employee_id) as calisan_sayisi from hr.employees e
+right join hr.departments d
+on e.department_id = d.department_id
+group by d.department_name;
+
+--Tüm departmanlar ve tüm çalışanlar listelensin eşleşmeyenler NULL görünsün.
+select e.first_name, e.last_name, d.department_name
+from hr.employees e
+full outer join hr.departments d
+on e.department_id = d.department_id;
+
+
+--ALT SORGULAR
+
+--Maaşı departmanındaki en yüksek maaştan az olan çalışanları listele.
+select first_name,last_name,salary,department_id from hr.employees e
+where salary <
+ ( select max(salary) from hr.employees
+   where department_id = e.department_id);
+
+
+--Lokasyonu 1700 olan departmanlarda çalışanların ad ve soyadını listele.
+select first_name,last_name,department_id from hr.EMPLOYEES
+where department_id in 
+(select department_id from departments
+  where location_id=1700);
+
+--Ortalama maaşı 6000’in üstünde olan departmanlarda çalışanları listele.
+select first_name,last_name, department_id,salary from hr.EMPLOYEES
+where department_id in
+( select department_id from hr.employees
+group by department_id
+having avg(salary)>6000);
+
+--Prim alan çalışanları listeler.
+select first_name,last_name, commission_pct from hr..employees e
+where exists 
+( select 1 from hr.employees 
+    where commission_pct is not null
+      and employee_id = e.employee_id
+);
+
+
+--Her departmanda ortalama maaşı aşan çalışanları ve departman ortalamasını listele.
+select e.first_name,e.last_name,e.salary,e.department_id,
+       (select avg(salary)from hr.employees
+        where department_id = e.department_id) as departman_ort_maas from hr.employees e
+        where e.salary > 
+        (select avg(salary)from hr.employees
+    where department_id = e.department_id);
+
+
+--UNION/UNION ALL
+
+--Departmanı 10 veya maaşı 8000’den fazla olan çalışanların ad-soyadını tek bir listede göster.
+select first_name, last_name from hr.employees
+where department_id = 10
+union --tekil liste yapmak istiyorum çünkü, çoklu isteseydim union all kullanacaktım.
+select first_name, last_name from hr.employees
+where salary > 8000;
+
+--ANALİTİK FONKSİYONLAR
+
+--Her departmanda en yüksek 2 maaşı alan çalışanları listele.
+with sirali as 
+( select first_name, last_name, department_id, salary,
+  rank() over (partition by department_id order by salary desc) as siralama from hr.employees
+)
+select * from sirali
+where siralama <= 2;
+
+
+--WITH/ RECURSIVE CTE
+
+--Yönetici hiyerarşisini ve kaçıncı seviyede olduklarını listele.
+with recursive yonetici_hiyer as 
+(   select employee_id, first_name, manager_id, 1 as seviye from hr.employees
+    where manager_id is null
+    union all
+    select e.employee_id, e.first_name, e.manager_id, yh.seviye + 1 from hr.employees e
+    inner join yonetici_hiyer yh
+    on e.manager_id = yh.employee_id )
+select * from yonetici_hiyer;
+
+
+--PIVOT/UNPIVOT
+
+--Departman bazında çalışan sayısını job_id sütunlarına dağıt.
+select *from 
+(   select department_id, job_id from employees)
+pivot ( count(job_id)
+    for job_id in ('IT_PROG' as it_programmer, 'SA_REP' as sales_rep, 'AD_VP' as admin_vp));
+
+
+--VERİ MANİPÜLASYONU (Insert/Delete)
+
+--Yeni bir çalışan ekleyelim: ad Ali, soyad Yılmaz, departman 10, maaş 5500, işe giriş tarihi bugün.
+insert into employees (employee_id, first_name, last_name, department_id, salary, hire_date)
+values (employees_seq.nextval, 'Ali', 'Yılmaz', 10, 5500, sysdate);
+
+
+--Maaşı 2000’den düşük olan tüm çalışanları sil.
+delete from employees where salary < 2000;
+
+
+--ORACLE'A ÖZGÜ FONKSİYONLAR
+
+--Bugünün tarihini ve 10 gün sonraki tarihi göster.
+select sysdate as bugun, sysdate + 10 as on_gun_sonra from dual;
+
+--Prim null olanlara 0 yaz.
+select first_name, last_name, nvl(commission_pct, 0) as prim
+from hr.employees;
+
+--Maaşı 7000’den yüksek olan çalışanlara ‘yüksek’, değilse ‘normal’ yaz.
+select first_name, last_name, decode(sign(salary - 7000), 1, 'yüksek', 'normal') as maas_durum
+from hr.employees;
